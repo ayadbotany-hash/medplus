@@ -1,0 +1,622 @@
+import React, { useState } from 'react';
+import { 
+  Calculator, BookOpen, Briefcase, FileUp, UserCheck, 
+  Search, AlertTriangle, ShieldAlert, CheckCircle, Globe, LogIn, Trash2, ArrowRight
+} from 'lucide-react';
+
+// --- DATA: Drug Library & Dosing Rules ---
+const INITIAL_DRUGS = [
+  {
+    id: 'paracetamol',
+    nameEn: 'Paracetamol (Acetaminophen)',
+    nameAr: 'باراسيتامول (أسيتامينوفين)',
+    category: 'Analgesics & Antipyretics',
+    categoryAr: 'مسكنات الألم ومخفضات الحرارة',
+    formulations: [
+      { label: '120 mg / 5 mL (Syrup)', mg: 120, ml: 5 },
+      { label: '250 mg / 5 mL (Forte Syrup)', mg: 250, ml: 5 },
+      { label: '500 mg (Tablet)', mg: 500, ml: 1 }
+    ],
+    pediatricDoseMgKg: 15, // mg/kg per dose
+    dosesPerDay: 4,
+    maxDailyDoseMg: 4000,
+    minAgeMonths: 1,
+    descriptionEn: 'Used for mild-to-moderate pain relief and fever reduction.',
+    descriptionAr: 'يستخدم لتخفيف الآلام الخفيفة إلى المتوسطة وخفض الحرارة.'
+  },
+  {
+    id: 'ibuprofen',
+    nameEn: 'Ibuprofen',
+    nameAr: 'إيبوبروفين',
+    category: 'Analgesics & Antipyretics',
+    categoryAr: 'مسكنات الألم ومخفضات الحرارة',
+    formulations: [
+      { label: '100 mg / 5 mL (Syrup)', mg: 100, ml: 5 },
+      { label: '400 mg (Tablet)', mg: 400, ml: 1 }
+    ],
+    pediatricDoseMgKg: 10,
+    dosesPerDay: 3,
+    maxDailyDoseMg: 2400,
+    minAgeMonths: 3,
+    descriptionEn: 'NSAID used for reducing inflammation, pain, and fever.',
+    descriptionAr: 'مضاد التهاب غير ستيرويدي لتقليل التهابات والجسم والحرارة.'
+  },
+  {
+    id: 'amoxicillin',
+    nameEn: 'Amoxicillin',
+    nameAr: 'أموكسيسيلين',
+    category: 'Antibiotics',
+    categoryAr: 'المضادات الحيوية',
+    formulations: [
+      { label: '125 mg / 5 mL', mg: 125, ml: 5 },
+      { label: '250 mg / 5 mL', mg: 250, ml: 5 },
+      { label: '500 mg (Capsule)', mg: 500, ml: 1 }
+    ],
+    pediatricDoseMgKg: 20, // 20-40 mg/kg/day divided
+    dosesPerDay: 3,
+    maxDailyDoseMg: 3000,
+    minAgeMonths: 1,
+    descriptionEn: 'Broad-spectrum penicillin antibiotic for bacterial infections.',
+    descriptionAr: 'مضاد حيوي واسع الطيف لعلاج العدوى البكتيرية.'
+  }
+];
+
+const INITIAL_JOBS = [
+  {
+    id: 1,
+    titleEn: 'Quality Control Pharmacist',
+    titleAr: 'صيدلي ضبط جودة',
+    org: 'Sarwaran Pharmacies',
+    location: 'Erbil, Iraq',
+    type: 'Full-time',
+    descAr: 'مطلوب صيدلي لمتابعة جودة الفروع وتطبيق معايير السلامة والتفتيش.',
+    deadline: '2026-10-15'
+  },
+  {
+    id: 2,
+    titleEn: 'Medical Representative',
+    titleAr: 'مندوب إعلام طبي',
+    org: 'Pharma Care Co.',
+    location: 'Erbil / Sulaymaniyah',
+    type: 'Full-time',
+    descAr: 'التواصل مع الأطباء والصيدليات والتسويق لمنتجات الشركة الطبية.',
+    deadline: '2026-10-20'
+  }
+];
+
+export default function App() {
+  const [lang, setLang] = useState('ar'); // 'ar' or 'en'
+  const [activeTab, setActiveTab] = useState('calc'); // 'calc', 'library', 'jobs', 'cv', 'auth'
+  
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPass, setAuthPass] = useState('');
+
+  // Calculator State
+  const [selectedDrugId, setSelectedDrugId] = useState('paracetamol');
+  const [ageValue, setAgeValue] = useState(2);
+  const [ageUnit, setAgeUnit] = useState('years'); // 'days', 'months', 'years'
+  const [weightKg, setWeightKg] = useState(12);
+  const [selectedFormIdx, setSelectedFormIdx] = useState(0);
+
+  // Search State
+  const [drugSearch, setDrugSearch] = useState('');
+  const [jobSearch, setJobSearch] = useState('');
+
+  // CV Form State
+  const [cvData, setCvData] = useState({ name: '', phone: '', email: '', role: 'Pharmacist', file: null });
+  const [cvSubmitted, setCvSubmitted] = useState(false);
+
+  const isAr = lang === 'ar';
+  const selectedDrug = INITIAL_DRUGS.find(d => d.id === selectedDrugId) || INITIAL_DRUGS[0];
+  const selectedForm = selectedDrug.formulations[selectedFormIdx] || selectedDrug.formulations[0];
+
+  // --- CALCULATION LOGIC ---
+  const calculateDosage = () => {
+    // Age Check
+    let ageInMonths = ageValue;
+    if (ageUnit === 'years') ageInMonths = ageValue * 12;
+    if (ageUnit === 'days') ageInMonths = ageValue / 30;
+
+    const isAgeRestricted = ageInMonths < selectedDrug.minAgeMonths;
+
+    // Single dose in mg
+    let singleDoseMg = weightKg * selectedDrug.pediatricDoseMgKg;
+    let totalDailyMg = singleDoseMg * selectedDrug.dosesPerDay;
+    
+    let isMaxCapped = false;
+    if (totalDailyMg > selectedDrug.maxDailyDoseMg) {
+      totalDailyMg = selectedDrug.maxDailyDoseMg;
+      singleDoseMg = totalDailyMg / selectedDrug.dosesPerDay;
+      isMaxCapped = true;
+    }
+
+    // Single Dose in mL
+    const singleDoseMl = (singleDoseMg * selectedForm.ml) / selectedForm.mg;
+
+    return {
+      singleDoseMg: singleDoseMg.toFixed(1),
+      singleDoseMl: singleDoseMl.toFixed(2),
+      totalDailyMg: totalDailyMg.toFixed(1),
+      isMaxCapped,
+      isAgeRestricted
+    };
+  };
+
+  const calcResult = calculateDosage();
+
+  // Handlers
+  const handleSelectDrugFromLibrary = (id) => {
+    setSelectedDrugId(id);
+    setSelectedFormIdx(0);
+    setActiveTab('calc');
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (authEmail) {
+      setUser({ email: authEmail, role: 'Professional' });
+      setActiveTab('calc');
+    }
+  };
+
+  const handleCvSubmit = (e) => {
+    e.preventDefault();
+    if (cvData.name && cvData.email) {
+      setCvSubmitted(true);
+    }
+  };
+
+  return (
+    <div className={`min-h-screen bg-slate-50 text-slate-800 font-sans ${isAr ? 'rtl' : 'ltr'}`} dir={isAr ? 'rtl' : 'ltr'}>
+      
+      {/* --- HEADER / NAVIGATION --- */}
+      <header className="bg-teal-700 text-white shadow-md sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Calculator className="w-7 h-7 text-teal-200" />
+            <h1 className="text-xl font-bold tracking-wide">
+              {isAr ? 'البوابة الطبية & حاسبة الجرعات' : 'MedCalc & Health Portal'}
+            </h1>
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="flex items-center gap-1 overflow-x-auto text-sm font-medium">
+            <button 
+              onClick={() => setActiveTab('calc')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${activeTab === 'calc' ? 'bg-teal-900 text-white' : 'hover:bg-teal-600'}`}
+            >
+              <Calculator className="w-4 h-4" /> {isAr ? 'حاسبة الجرعات' : 'Calculator'}
+            </button>
+            <button 
+              onClick={() => setActiveTab('library')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${activeTab === 'library' ? 'bg-teal-900 text-white' : 'hover:bg-teal-600'}`}
+            >
+              <BookOpen className="w-4 h-4" /> {isAr ? 'دليل الأدوية' : 'Drug Ref'}
+            </button>
+            <button 
+              onClick={() => setActiveTab('jobs')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${activeTab === 'jobs' ? 'bg-teal-900 text-white' : 'hover:bg-teal-600'}`}
+            >
+              <Briefcase className="w-4 h-4" /> {isAr ? 'فرص العمل' : 'Jobs'}
+            </button>
+            <button 
+              onClick={() => setActiveTab('cv')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${activeTab === 'cv' ? 'bg-teal-900 text-white' : 'hover:bg-teal-600'}`}
+            >
+              <FileUp className="w-4 h-4" /> {isAr ? 'تقديم CV' : 'Submit CV'}
+            </button>
+          </nav>
+
+          {/* User / Language Toggle */}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')}
+              className="p-1.5 rounded bg-teal-800 hover:bg-teal-900 text-xs flex items-center gap-1"
+            >
+              <Globe className="w-3.5 h-3.5" /> {isAr ? 'EN' : 'العربية'}
+            </button>
+
+            {user ? (
+              <button 
+                onClick={() => setActiveTab('auth')}
+                className="px-2.5 py-1 bg-teal-800 hover:bg-teal-900 rounded text-xs flex items-center gap-1"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-teal-300" /> {user.email.split('@')[0]}
+              </button>
+            ) : (
+              <button 
+                onClick={() => setActiveTab('auth')}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded text-xs flex items-center gap-1"
+              >
+                <LogIn className="w-3.5 h-3.5" /> {isAr ? 'دخول' : 'Login'}
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* --- MAIN CONTENT AREA --- */}
+      <main className="max-w-5xl mx-auto px-4 py-8">
+
+        {/* 1. DOSAGE CALCULATOR PAGE */}
+        {activeTab === 'calc' && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <h2 className="text-lg font-bold text-teal-800 mb-4 border-b pb-2 flex items-center gap-2">
+                <Calculator className="w-5 h-5" />
+                {isAr ? 'حاسبة الجرعات الدوائية للأطفال والبالغين' : 'Pediatric & Adult Dosage Calculator'}
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Inputs */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{isAr ? 'اختر الدواء:' : 'Select Medication:'}</label>
+                    <select 
+                      value={selectedDrugId} 
+                      onChange={(e) => { setSelectedDrugId(e.target.value); setSelectedFormIdx(0); }}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                    >
+                      {INITIAL_DRUGS.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {isAr ? d.nameAr : d.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{isAr ? 'الشكل الصيدلاني والتركيز:' : 'Concentration / Form:'}</label>
+                    <select 
+                      value={selectedFormIdx} 
+                      onChange={(e) => setSelectedFormIdx(Number(e.target.value))}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                    >
+                      {selectedDrug.formulations.map((f, idx) => (
+                        <option key={idx} value={idx}>{f.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">{isAr ? 'العمر:' : 'Age:'}</label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        value={ageValue} 
+                        onChange={(e) => setAgeValue(Number(e.target.value))}
+                        className="w-full p-2 bg-slate-50 border rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">{isAr ? 'الوحدة:' : 'Unit:'}</label>
+                      <select 
+                        value={ageUnit} 
+                        onChange={(e) => setAgeUnit(e.target.value)}
+                        className="w-full p-2 bg-slate-50 border rounded-lg"
+                      >
+                        <option value="days">{isAr ? 'أيام' : 'Days'}</option>
+                        <option value="months">{isAr ? 'أشهر' : 'Months'}</option>
+                        <option value="years">{isAr ? 'سنوات' : 'Years'}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{isAr ? 'الوزن (كغم):' : 'Weight (kg):'}</label>
+                    <input 
+                      type="number" 
+                      step="0.5"
+                      min="1"
+                      value={weightKg} 
+                      onChange={(e) => setWeightKg(Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 border rounded-lg font-semibold text-teal-900"
+                    />
+                  </div>
+                </div>
+
+                {/* Outputs & Results */}
+                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                      {isAr ? 'نتيجة الجرعة المحسوبة:' : 'Calculated Result:'}
+                    </h3>
+
+                    {calcResult.isAgeRestricted ? (
+                      <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center gap-2 mb-4">
+                        <AlertTriangle className="w-5 h-5 shrink-0" />
+                        <span className="text-xs font-semibold">
+                          {isAr ? 'تحذير: هذا الدواء غير مخصص لهذا العمر الصغير.' : 'Warning: Drug contraindicated for this age.'}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    {calcResult.isMaxCapped && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-center gap-2 mb-4 text-xs">
+                        <ShieldAlert className="w-5 h-5 shrink-0 text-amber-600" />
+                        <span>{isAr ? 'تم تجاوز الجرعة اليومية القصوى! تم تعديل الجرعة تلقائياً للحد الأقصى الآمن.' : 'Max daily limit reached! Capped to maximum safe dosage.'}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div className="bg-white p-4 rounded-lg shadow-sm border border-teal-100">
+                        <span className="text-xs text-slate-500 block">{isAr ? 'الجرعة في المرة الواحدة (حجم):' : 'Single Dose (Volume):'}</span>
+                        <span className="text-3xl font-extrabold text-teal-700">{calcResult.singleDoseMl} <span className="text-lg">mL / مل</span></span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-white p-2.5 rounded border">
+                          <span className="text-slate-400 block">{isAr ? 'الجرعة بالملغم:' : 'Single Dose (mg):'}</span>
+                          <span className="font-bold text-slate-700">{calcResult.singleDoseMg} mg</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded border">
+                          <span className="text-slate-400 block">{isAr ? 'التكرار اليومي:' : 'Frequency:'}</span>
+                          <span className="font-bold text-slate-700">كل {24 / selectedDrug.dosesPerDay} ساعات ({selectedDrug.dosesPerDay} مرات)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t text-xs text-slate-400">
+                    * {isAr ? 'الجرعة الإجمالية اليومية:' : 'Total Daily Dose:'} {calcResult.totalDailyMg} mg / {isAr ? 'الحد الأقصى:' : 'Max Limit:'} {selectedDrug.maxDailyDoseMg} mg
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. DRUG CLASSIFICATION & REFERENCE LIBRARY */}
+        {activeTab === 'library' && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h2 className="text-xl font-bold text-slate-800">{isAr ? 'تصنيف الأدوية ومكتبة الجرعات' : 'Drug Classification Reference'}</h2>
+              <div className="relative w-full md:w-72">
+                <Search className="w-4 h-4 absolute top-3 right-3 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder={isAr ? 'ابحث باسم الدواء...' : 'Search drugs...'}
+                  value={drugSearch}
+                  onChange={(e) => setDrugSearch(e.target.value)}
+                  className="w-full pl-3 pr-9 py-2 bg-white border rounded-lg text-sm shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {INITIAL_DRUGS
+                .filter(d => (isAr ? d.nameAr : d.nameEn).toLowerCase().includes(drugSearch.toLowerCase()))
+                .map(drug => (
+                  <div key={drug.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-teal-300 transition flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="font-bold text-teal-800">{isAr ? drug.nameAr : drug.nameEn}</h3>
+                        <span className="bg-teal-50 text-teal-700 text-xs px-2 py-1 rounded font-medium">
+                          {isAr ? drug.categoryAr : drug.category}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mb-4">{isAr ? drug.descriptionAr : drug.descriptionEn}</p>
+                    </div>
+
+                    <div className="pt-3 border-t flex items-center justify-between">
+                      <span className="text-xs text-slate-400">
+                        {isAr ? 'الجرعة القياسية:' : 'Std Dose:'} {drug.pediatricDoseMgKg} mg/kg
+                      </span>
+                      <button 
+                        onClick={() => handleSelectDrugFromLibrary(drug.id)}
+                        className="text-xs font-bold text-teal-600 hover:text-teal-800 flex items-center gap-1"
+                      >
+                        {isAr ? 'احسب الجرعة' : 'Calculate'} <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. CAREER & JOB BOARD */}
+        {activeTab === 'jobs' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold text-slate-800">{isAr ? 'فرص العمل الطبية والصيدلانية' : 'Healthcare Job Opportunities'}</h2>
+            
+            <div className="space-y-4">
+              {INITIAL_JOBS.map(job => (
+                <div key={job.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-slate-800">{isAr ? job.titleAr : job.titleEn}</h3>
+                      <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded">{job.type}</span>
+                    </div>
+                    <p className="text-xs font-semibold text-teal-700 mb-2">{job.org} - {job.location}</p>
+                    <p className="text-xs text-slate-600">{job.descAr}</p>
+                  </div>
+
+                  <button 
+                    onClick={() => setActiveTab('cv')}
+                    className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-medium rounded-lg text-xs shrink-0"
+                  >
+                    {isAr ? 'قدم الآن' : 'Apply Now'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4. CV SUBMISSION MODULE */}
+        {activeTab === 'cv' && (
+          <div className="max-w-xl mx-auto bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-bold text-teal-800 mb-4 border-b pb-2 flex items-center gap-2">
+              <FileUp className="w-5 h-5" />
+              {isAr ? 'تقديم السيرة الذاتية (CV)' : 'Submit Your CV'}
+            </h2>
+
+            {cvSubmitted ? (
+              <div className="p-6 text-center space-y-3">
+                <CheckCircle className="w-12 h-12 text-teal-600 mx-auto" />
+                <h3 className="font-bold text-slate-800">{isAr ? 'تم استلام طلبك بنجاح!' : 'Application Submitted!'}</h3>
+                <p className="text-xs text-slate-500">
+                  {isAr ? 'سيتم مراجعة ملفك والتواصل معك فور توفر فرصة مناسبة.' : 'We will review your CV and contact you soon.'}
+                </p>
+                <button 
+                  onClick={() => setCvSubmitted(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs rounded-lg mt-2"
+                >
+                  {isAr ? 'تقديم طلب آخر' : 'Submit Another'}
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleCvSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1">{isAr ? 'الاسم الكامل:' : 'Full Name:'}</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={cvData.name}
+                    onChange={e => setCvData({...cvData, name: e.target.value})}
+                    className="w-full p-2 border rounded-lg text-sm bg-slate-50"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">{isAr ? 'البريد الإلكتروني:' : 'Email:'}</label>
+                    <input 
+                      type="email" 
+                      required 
+                      value={cvData.email}
+                      onChange={e => setCvData({...cvData, email: e.target.value})}
+                      className="w-full p-2 border rounded-lg text-sm bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">{isAr ? 'رقم الهاتف:' : 'Phone:'}</label>
+                    <input 
+                      type="tel" 
+                      required 
+                      value={cvData.phone}
+                      onChange={e => setCvData({...cvData, phone: e.target.value})}
+                      className="w-full p-2 border rounded-lg text-sm bg-slate-50"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1">{isAr ? 'التخصص الطبي:' : 'Medical Specialty:'}</label>
+                  <select 
+                    value={cvData.role}
+                    onChange={e => setCvData({...cvData, role: e.target.value})}
+                    className="w-full p-2 border rounded-lg text-sm bg-slate-50"
+                  >
+                    <option value="Pharmacist">{isAr ? 'صيدلي' : 'Pharmacist'}</option>
+                    <option value="Doctor">{isAr ? 'طبيب' : 'Doctor'}</option>
+                    <option value="Quality Control">{isAr ? 'جودة وتفتيش' : 'Quality Control'}</option>
+                    <option value="Technician">{isAr ? 'مساعد صيدلي' : 'Pharmacy Technician'}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1">{isAr ? 'ارفق ملف السيرة الذاتية (PDF):' : 'Upload CV (PDF):'}</label>
+                  <input 
+                    type="file" 
+                    accept=".pdf,.docx"
+                    required
+                    onChange={e => setCvData({...cvData, file: e.target.files[0]})}
+                    className="w-full p-2 border rounded-lg text-xs bg-slate-50"
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-lg text-sm"
+                >
+                  {isAr ? 'إرسال السيرة الذاتية' : 'Submit Application'}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* 5. USER AUTH & PROFILE */}
+        {activeTab === 'auth' && (
+          <div className="max-w-md mx-auto bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            {user ? (
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-slate-800 border-b pb-2">{isAr ? 'الملف الشخصي' : 'User Profile'}</h2>
+                <div className="text-xs space-y-1">
+                  <p><span className="text-slate-400">{isAr ? 'البريد:' : 'Email:'}</span> {user.email}</p>
+                  <p><span className="text-slate-400">{isAr ? 'نوع الحساب:' : 'Role:'}</span> {user.role}</p>
+                </div>
+
+                <div className="pt-4 border-t space-y-2">
+                  <button 
+                    onClick={() => setUser(null)}
+                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg"
+                  >
+                    {isAr ? 'تسجيل الخروج' : 'Logout'}
+                  </button>
+
+                  <button 
+                    onClick={() => { setUser(null); alert(isAr ? 'تم حذف الحساب بنجاح.' : 'Account deleted.'); }}
+                    className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 font-medium text-xs rounded-lg flex items-center justify-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> {isAr ? 'حذف الحساب نهائياً' : 'Delete Account'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-lg font-bold text-teal-800 mb-4 border-b pb-2">{isAr ? 'تسجيل الدخول' : 'Sign In'}</h2>
+                <form onSubmit={handleLogin} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">{isAr ? 'البريد الإلكتروني:' : 'Email:'}</label>
+                    <input 
+                      type="email" 
+                      required
+                      value={authEmail}
+                      onChange={e => setAuthEmail(e.target.value)}
+                      className="w-full p-2 border rounded-lg text-sm bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">{isAr ? 'كلمة السر:' : 'Password:'}</label>
+                    <input 
+                      type="password" 
+                      required
+                      value={authPass}
+                      onChange={e => setAuthPass(e.target.value)}
+                      className="w-full p-2 border rounded-lg text-sm bg-slate-50"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-lg text-sm"
+                  >
+                    {isAr ? 'دخول' : 'Sign In'}
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
+
+      </main>
+
+      {/* --- FOOTER & DISCLAIMER --- */}
+      <footer className="mt-12 bg-slate-800 text-slate-400 text-xs py-6 border-t border-slate-700">
+        <div className="max-w-5xl mx-auto px-4 text-center space-y-2">
+          <p className="text-amber-400 font-semibold">
+            {isAr ? 'إخلاء مسؤولية طبي:' : 'Medical Disclaimer:'} {isAr ? 'هذا التطبيق أداة مساعدة للممارسين الصحيين ولا يغني عن القرار الطبي المستقل.' : 'This tool is for educational & decision-support purposes only.'}
+          </p>
+          <p>© 2026 Sarwaran Pharmacies & Medical Portal. All rights reserved.</p>
+        </div>
+      </footer>
+
+    </div>
+  );
+}
