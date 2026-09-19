@@ -1,4 +1,4 @@
-import RxNormSearch from "@/components/rxnorm-search"
+import RxNormSearch from "../components/rxnorm-search"
 
 export default function Home() {
   return (
