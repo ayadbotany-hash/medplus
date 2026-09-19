@@ -2,28 +2,28 @@
 
 import { useState, useEffect } from "react"
 
-// قائمة الأسماء العلمية الشاملة والمواد الفعالة (بما فيها أدوية الحقن والإبر)
-const GLOBAL_GENERIC_DRUGS = [
-  // أدوية الحقن والإبر الفعالة (Injectables & Antibiotics)
+// مصفوفة فريدة بدون تكرار للأسماء العلمية
+const GLOBAL_GENERIC_DRUGS = Array.from(new Set([
+  // أدوية الحقن والإبر الفعالة
   "Meropenem", "Ceftriaxone", "Cefotaxime", "Ceftazidime", "Cefepime", "Cefazolin", 
   "Amikacin", "Gentamicin", "Tobramycin", "Vancomycin", "Teicoplanin", "Colistin",
   "Imipenem", "Ertapenem", "Piperacillin", "Tazobactam", "Ampicillin", "Sulbactam",
   "Metronidazole", "Ciprofloxacin", "Levofloxacin", "Moxifloxacin", "Fluconazole",
   "Voriconazole", "Caspefungin", "Anidulafungin", "Amphotericin B", "Aciclovir",
   
-  // الحقن المسكنة والمهدئة والمضادة للالتهاب (IV/IM Pain & Anti-inflammatory)
+  // الحقن المسكنة والمهدئة
   "Diclofenac", "Ketorolac", "Piroxicam", "Paracetamol", "Tramadol", "Morphine",
   "Fentanyl", "Pethidine", "Buprenorphine", "Ondansetron", "Metoclopramide",
   "Hyoscine butylbromide", "Dexamethasone", "Hydrocortisone", "Methylprednisolone",
   "Prednisolone", "Betamethasone", "Triamcinolone",
   
-  // أدوية الأعصاب والتشنجات والقلب بالحقن (Anticonvulsants & Cardiac IV)
+  // أدوية الأعصاب والتشنجات والقلب
   "Levetiracetam", "Valproate sodium", "Phenytoin", "Phenobarbital", "Diazepam",
   "Midazolam", "Lorazepam", "Haloperidol", "Amiodarone", "Atropine", "Adrenaline",
   "Epinephrine", "Norepinephrine", "Dopamine", "Dobutamine", "Furosemide",
   "Heparin", "Enoxaparin", "Fondaparinux", "Insulin human", "Insulin glargine",
   
-  // المواد العلمية العامة (Generics A-Z)
+  // الأسماء العلمية العامة (A-Z)
   "Abacavir", "Abiraterone", "Acamprosate", "Acarbose", "Acebutolol", "Aceclofenac",
   "Acetazolamide", "Acetylcysteine", "Acitretin", "Adalimumab", "Adapalene", "Adefovir",
   "Adenosine", "Afatinib", "Albendazole", "Albuterol", "Alectinib", "Alendronate",
@@ -127,7 +127,7 @@ const GLOBAL_GENERIC_DRUGS = [
   "Vinblastine", "Vincristine", "Vinorelbine", "Voriconazole", "Vortioxetine", "Warfarin",
   "Zalcitabine", "Zaleplon", "Zanamivir", "Zidovudine", "Ziprasidone", "Zoledronic acid",
   "Zolmitriptan", "Zolpidem", "Zonisamide", "Zuclopenthixol"
-]
+]))
 
 export default function RxNormSearch({
   onSelectDrug,
@@ -142,7 +142,6 @@ export default function RxNormSearch({
   useEffect(() => {
     if (query.trim().length >= 2) {
       const cleanQuery = query.trim().toLowerCase()
-      // الفلترة السريعة والمضمونة للأسماء العلمية الصافية فقط
       const matches = GLOBAL_GENERIC_DRUGS.filter(drug =>
         drug.toLowerCase().includes(cleanQuery)
       )
